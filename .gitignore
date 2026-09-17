@@ -1,7 +1,7 @@
-# Compiled object files
+# Common C build outputs
 *.o
-*.obj
-
+*.out
+*.exe
 # VaultDB executable
 vaultdb
 
@@ -16,3 +16,5 @@ build/
 
 # Debug files
 *.dSYM/
+
+src/main
