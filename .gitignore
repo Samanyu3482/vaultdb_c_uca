@@ -21,3 +21,7 @@ src/main
 
 *.doc
 *.docx
+
+*.txt
+
+*.md
