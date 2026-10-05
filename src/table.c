@@ -14,14 +14,15 @@ Table *table_create(const char* name, int initial_capacity) {
         return NULL;
     }
     strcpy(table -> name, name);
-    table -> records = malloc(initial_capacity * sizeof(Record));
+    int cap = (initial_capacity > 0) ? initial_capacity : 1;
+    table -> records = malloc(cap * sizeof(Record));
     if(table -> records == NULL) {
         free(table->name);
         free(table);
         return NULL;
     }
     table -> record_count = 0;
-    table -> capacity = initial_capacity;
+    table -> capacity = cap;
 
     return table;
 
@@ -110,3 +111,6 @@ int table_delete(Table *table, int id) {
 
     return -1;
 }
+
+
+

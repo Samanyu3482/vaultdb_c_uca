@@ -9,23 +9,21 @@ int storage_save_table(Table *table, const char *filename) {
     FILE *file = fopen(filename, "wb");
     if (file == NULL) return -1;
 
-   
     int name_len = strlen(table->name) + 1;
-    fwrite(&name_len, sizeof(int), 1, file);
-    fwrite(table->name, sizeof(char), name_len, file);
-    fwrite(&table->record_count, sizeof(int), 1, file);
-
+    if (fwrite(&name_len, sizeof(int), 1, file) != 1) { fclose(file); return -1; }
+    if (fwrite(table->name, sizeof(char), name_len, file) != (size_t)name_len) { fclose(file); return -1; }
+    if (fwrite(&table->record_count, sizeof(int), 1, file) != 1) { fclose(file); return -1; }
 
     for (int i = 0; i < table->record_count; i++) {
         Record *r = &table->records[i];
 
-        fwrite(&r->id, sizeof(int), 1, file);
-        fwrite(&r->price, sizeof(int), 1, file);
-        fwrite(&r->stock, sizeof(int), 1, file);
+        if (fwrite(&r->id, sizeof(int), 1, file) != 1) { fclose(file); return -1; }
+        if (fwrite(&r->price, sizeof(int), 1, file) != 1) { fclose(file); return -1; }
+        if (fwrite(&r->stock, sizeof(int), 1, file) != 1) { fclose(file); return -1; }
 
         int rec_name_len = strlen(r->name) + 1;
-        fwrite(&rec_name_len, sizeof(int), 1, file);
-        fwrite(r->name, sizeof(char), rec_name_len, file);
+        if (fwrite(&rec_name_len, sizeof(int), 1, file) != 1) { fclose(file); return -1; }
+        if (fwrite(r->name, sizeof(char), rec_name_len, file) != (size_t)rec_name_len) { fclose(file); return -1; }
     }
 
     fclose(file);
@@ -93,3 +91,6 @@ fail:
     table_destroy(table);
     return NULL;
 }
+
+
+

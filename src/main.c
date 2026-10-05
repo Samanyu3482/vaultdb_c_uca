@@ -1,41 +1,69 @@
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 #include "parser.h"
+#include "table.h"
+#include "executor.h"
+#include "storage.h"
 
 int main(void) {
-    printf("VaultDB starting...\n\n");
+    printf("VaultDB version 1.0. Type .exit to quit.\n");
 
-    // 1. Test INSERT
-    Command cmd_ins = parse_command("INSERT INTO products VALUES (1, \"Keyboard\", 1200, 10);");
-    if (cmd_ins.type == CMD_INSERT) {
-        printf("Parsed INSERT:\n");
-        printf("  Table: %s\n", cmd_ins.table_name);
-        printf("  ID: %d, Name: %s, Price: %d, Stock: %d\n\n", 
-               cmd_ins.id, cmd_ins.record_name, cmd_ins.price, cmd_ins.stock);
+    Table *active_table = NULL;
+
+    while (1) {
+        printf("vaultdb> ");
+
+        char input_buffer[512];
+        if (fgets(input_buffer, sizeof(input_buffer), stdin) == NULL) {
+            printf("Error reading input.\n");
+            continue;
+        }
+
+        input_buffer[strcspn(input_buffer, "\n")] = '\0';
+
+        if (strlen(input_buffer) == 0) {
+            continue;
+        }
+
+        /* Meta-commands */
+        if (strcmp(input_buffer, ".exit") == 0) {
+            break;
+        }
+
+        if (strcmp(input_buffer, ".save") == 0) {
+            if (active_table != NULL) {
+                storage_save_table(active_table, "data/vault.db");
+                printf("Saved to data/vault.db\n");
+            } else {
+                printf("No active table to save.\n");
+            }
+            continue;
+        }
+
+        if (strcmp(input_buffer, ".load") == 0) {
+            Table *loaded = storage_load_table("data/vault.db");
+            if (loaded != NULL) {
+                if (active_table != NULL) table_destroy(active_table);
+                active_table = loaded;
+                printf("Loaded from data/vault.db\n");
+            } else {
+                printf("Failed to load. Existing table unchanged.\n");
+            }
+            continue;
+        }
+
+        /* SQL queries */
+        Command cmd = parse_command(input_buffer);
+        if (cmd.type == CMD_UNKNOWN) {
+            printf("Unrecognized command.\n");
+        } else {
+            execute_command(cmd, &active_table);
+        }
     }
 
-    // 2. Test SELECT
-    Command cmd_sel = parse_command("SELECT * FROM products;");
-    if (cmd_sel.type == CMD_SELECT) {
-        printf("Parsed SELECT:\n");
-        printf("  Table: %s\n\n", cmd_sel.table_name);
+    if (active_table != NULL) {
+        table_destroy(active_table);
     }
-
-    // 3. Test UPDATE
-    Command cmd_upd = parse_command("UPDATE products SET price = 999 WHERE id = 1;");
-    if (cmd_upd.type == CMD_UPDATE) {
-        printf("Parsed UPDATE:\n");
-        printf("  Table: %s\n", cmd_upd.table_name);
-        printf("  Set %s = %d\n", cmd_upd.set_column, cmd_upd.set_value_int);
-        printf("  Where %s = %d\n\n", cmd_upd.where_column, cmd_upd.where_value);
-    }
-
-    // 4. Test DELETE
-    Command cmd_del = parse_command("DELETE FROM products WHERE id = 1;");
-    if (cmd_del.type == CMD_DELETE) {
-        printf("Parsed DELETE:\n");
-        printf("  Table: %s\n", cmd_del.table_name);
-        printf("  Where %s = %d\n\n", cmd_del.where_column, cmd_del.where_value);
-    }
-
     return 0;
 }
