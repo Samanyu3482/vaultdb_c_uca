@@ -22,3 +22,5 @@ src/main
 *.doc
 *.docx
 
+# Local documentation (not for GitHub)
+DOCUMENTS_VAULTDB/
