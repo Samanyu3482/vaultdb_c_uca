@@ -68,3 +68,45 @@ int table_insert(Table *table, int id, const char *name, int price, int stock) {
     table->record_count++;
     return 0;
 }
+
+
+Record *table_select(Table *table, int id) {
+    if (table == NULL) return NULL;
+
+    for (int i = 0; i < table->record_count; i++) {
+        if (table->records[i].id == id) {
+            return &table->records[i];
+        }
+    }
+
+    return NULL;
+}
+
+
+int table_update(Table *table, int id, int new_price, int new_stock) {
+    Record *rec = table_select(table, id);
+    if (rec == NULL) return -1;
+
+    rec->price = new_price;
+    rec->stock = new_stock;
+    return 0;
+}
+
+int table_delete(Table *table, int id) {
+    if (table == NULL) return -1;
+
+    for (int i = 0; i < table->record_count; i++) {
+        if (table->records[i].id == id) {
+            free(table->records[i].name);
+
+            for (int j = i; j < table->record_count - 1; j++) {
+                table->records[j] = table->records[j + 1];
+            }
+
+            table->record_count--;
+            return 0;
+        }
+    }
+
+    return -1;
+}
