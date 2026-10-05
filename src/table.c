@@ -9,9 +9,14 @@ Table *table_create(const char* name, int initial_capacity) {
         return NULL;
     }
     table -> name = malloc(strlen(name) + 1);
+    if(table->name == NULL) {
+        free(table);
+        return NULL;
+    }
     strcpy(table -> name, name);
     table -> records = malloc(initial_capacity * sizeof(Record));
     if(table -> records == NULL) {
+        free(table->name);
         free(table);
         return NULL;
     }
@@ -39,3 +44,27 @@ void table_destroy(Table *table) {
 }
 
 
+int table_insert(Table *table, int id, const char *name, int price, int stock) {
+    if (table == NULL || name == NULL) return -1;
+
+    if (table->record_count == table->capacity) {
+        int newCapacity = (table->capacity == 0) ? 4 : table->capacity * 2;
+        Record *temp = realloc(table->records, newCapacity * sizeof(Record));
+        if (temp == NULL) return -1;  
+        table->records = temp;
+        table->capacity = newCapacity;
+    }
+
+    Record *slot = &table->records[table->record_count];
+
+    slot->name = malloc(strlen(name) + 1);
+    if (slot->name == NULL) return -1;
+    strcpy(slot->name, name);
+
+    slot->id = id;
+    slot->price = price;
+    slot->stock = stock;
+
+    table->record_count++;
+    return 0;
+}

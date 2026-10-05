@@ -1,0 +1,733 @@
+VaultDB
+A Lightweight Embedded Database Engine Built from Scratch in C
+Complete End-to-End Project Guide
+Planning • Architecture • Implementation • Testing • Performance • GitHub
+Master roadmap from empty directory to final submission
+How to Use This Guide
+This is the master implementation document for VaultDB. It consolidates the project specification, scope decisions, architecture, staged implementation plan, C-learning objectives, testing requirements, Git/GitHub requirements, documentation requirements, and final submission checklist.
+Build the project incrementally. Each phase should compile, run, and be tested before the next phase is started. Do not attempt to implement the entire database engine in one code dump.
+The core project must be implemented in C. External database systems such as MySQL, PostgreSQL, and SQLite are not to be used as the database engine.
+1. Project Definition
+VaultDB is a lightweight, offline-first embedded database engine built from scratch in C. It explores persistent storage, dynamic memory management, query processing, record management, searching, and indexing.
+VaultDB is deliberately smaller than a production database. The purpose is to demonstrate database and systems concepts clearly rather than recreate SQLite.
+User
+  ↓
+CLI
+  ↓
+Query Parser
+  ↓
+Query Executor
+  ↓
+Storage Engine
+  ↓
+database.db
+Index Manager integrates where appropriate.
+Core principle
+VaultDB is a database engine, not a generic CRUD application. The example business domain is only a way to demonstrate the engine.
+2. Problem Statement and Real-World Story
+Problem Statement
+Small businesses, local shops, clinics, pharmacies, workshops, and similar environments may need simple persistent local data storage without depending on a large database server or constant internet connectivity. VaultDB explores whether a lightweight local database engine can provide basic persistent storage and query functionality with a small resource footprint.
+Example Story
+A small shop can use a local file such as shop.db to store product data. The shop is not the product; VaultDB is the reusable database engine.
+products
+--------------------------------
+id | name       | price | stock
+--------------------------------
+1  | Keyboard   | 1200  | 10
+2  | Mouse      | 600   | 25
+3. Goals and Learning Outcomes
+Implement the core system entirely in C.
+Represent records, tables, metadata, and indexes with appropriate C data structures.
+Persist data to disk and reload it after restart.
+Use C file APIs for database storage.
+Use pointers and dynamic memory meaningfully.
+Implement CRUD operations.
+Implement a small SQL-like tokenizer/parser.
+Separate parsing from execution and storage.
+Implement linear search first and indexing later if feasible.
+Measure and explain time complexity and actual performance.
+Handle allocation, file, input, and data errors.
+Write modular, warning-clean, testable code.
+Produce a clean GitHub repository and professional documentation.
+Understand and defend every major design decision.
+4. Scope
+MVP
+Feature
+Definition
+Create/open database
+Create when needed and open an existing database.
+Persistence
+Records survive program restart.
+Create table
+Limited CREATE TABLE syntax.
+INSERT
+Insert records.
+SELECT
+Read records.
+UPDATE
+Modify records.
+DELETE
+Delete records.
+WHERE
+Simple filtering such as column = value.
+Search
+Linear search first.
+CLI
+Interactive VaultDB shell.
+Error handling
+Common input, file, memory, and data failures.
+Deliberately excluded from MVP
+Full SQL
+JOINs
+GROUP BY/HAVING
+Subqueries
+Full optimizer
+Transactions/complete ACID
+Concurrency
+Networking/distribution
+Replication
+Authentication
+Crash recovery/WAL
+Full production type system
+B-Tree/B+Tree initially
+Sophisticated buffer pool
+Bonus/future
+Simple sorted index
+Additional types if justified
+Improved page/block storage
+Better CLI
+B-Tree/B+Tree
+Transactions
+Query optimization
+Concurrency
+Crash recovery
+Joins
+5. Architecture
+                    ┌──────────────┐
+                    │     User     │
+                    └──────┬───────┘
+                           ▼
+                    ┌──────────────┐
+                    │     CLI      │
+                    └──────┬───────┘
+                           ▼
+                    ┌──────────────┐
+                    │    Parser    │
+                    └──────┬───────┘
+                           ▼
+                    ┌──────────────┐
+                    │   Executor   │
+                    └──────┬───────┘
+                           │
+                 ┌─────────┴─────────┐
+                 ▼                   ▼
+          ┌─────────────┐     ┌─────────────┐
+          │   Storage   │     │    Index    │
+          │   Engine    │     │   Manager   │
+          └──────┬──────┘     └──────┬──────┘
+                 └──────────┬────────┘
+                            ▼
+                     database.db
+Component
+Responsibility
+CLI
+Accept input, display results, handle command-line arguments.
+Parser
+Tokenize and parse the limited SQL-like language.
+Executor
+Perform operations represented by parsed commands.
+Table/Data Model
+Represent tables, records, metadata.
+Storage Engine
+Read/write persistent data.
+Index Manager
+Maintain lookup structures.
+Utilities
+Shared helpers only where genuinely useful.
+Design rule: parser should not know physical storage details, and storage should not depend on how the command was entered.
+6. Repository Structure
+vaultdb_c_uca/
+├── src/
+│   ├── main.c
+│   ├── record.c
+│   ├── table.c
+│   ├── storage.c
+│   ├── parser.c
+│   ├── executor.c
+│   ├── index.c
+│   └── utils.c
+├── include/
+│   ├── record.h
+│   ├── table.h
+│   ├── storage.h
+│   ├── parser.h
+│   ├── executor.h
+│   ├── index.h
+│   └── utils.h
+├── tests/
+├── data/
+├── README.md
+├── Makefile
+├── LICENSE
+└── .gitignore
+Path
+Purpose
+src/
+C implementation files.
+include/
+Headers and declarations.
+tests/
+Tests and benchmarks.
+data/
+Development database files.
+README.md
+Proposal and technical documentation.
+Makefile
+Build/clean workflow.
+LICENSE
+License.
+.gitignore
+Ignore build/editor/OS artifacts.
+7. Data Model
+Record
+struct Record {
+    int id;
+    char *name;
+    int price;
+    int stock;
+};
+The current record model uses a dynamically allocated name. record_create allocates the structure and name; record_destroy releases name first and then the structure.
+Table
+struct Table {
+    char *name;
+    struct Record *records;
+    int record_count;
+    int capacity;
+};
+record_count is the number of records currently used. capacity is the number of record slots currently allocated.
+capacity = 4
+record_count = 2
+[Record][Record][empty][empty]
+if record_count == capacity:
+    grow the allocation
+Database
+A later database-level structure will manage tables and database metadata. It should be introduced after the record/table layer is stable.
+8. Storage Design
+VaultDB must store data in a local database file such as database.db so that data survives program shutdown and restart.
+Start
+ ↓
+open/create database.db
+ ↓
+read metadata/data
+ ↓
+perform operations
+ ↓
+write changes
+ ↓
+close
+C file APIs
+FILE *
+fopen()
+fread()
+fwrite()
+fseek()
+ftell()
+fflush()
+fclose()
+Storage work
+Choose the on-disk representation.
+Define database metadata/header.
+Define table representation.
+Define record representation.
+Define offsets/locations if required.
+Implement create/open.
+Implement read.
+Implement write.
+Implement update/delete persistence.
+Validate malformed/corrupt data where practical.
+9. Query Language
+VaultDB supports a deliberately small SQL-like language, not full SQL.
+CREATE TABLE customers (id, name, phone);
+INSERT INTO customers VALUES (1, "Alice", "9876543210");
+SELECT * FROM customers;
+SELECT * FROM customers WHERE id = 1;
+UPDATE customers SET phone = "9999999999" WHERE id = 1;
+DELETE FROM customers WHERE id = 1;
+Suggested grammar
+CREATE TABLE <name> (...);
+INSERT INTO <table> VALUES (...);
+SELECT * FROM <table>;
+SELECT * FROM <table> WHERE <column> = <value>;
+UPDATE <table> SET <column> = <value> WHERE <column> = <value>;
+DELETE FROM <table> WHERE <column> = <value>;
+10. Query Processing
+Raw input
+   ↓
+Tokenizer
+   ↓
+Tokens
+   ↓
+Parser
+   ↓
+Structured Command
+   ↓
+Executor
+   ↓
+Table / Storage / Index
+   ↓
+Result
+   ↓
+CLI output
+Parser answers: what did the user ask? Executor answers: how should VaultDB perform it?
+SELECT * FROM products WHERE id = 10;
+type = SELECT
+table = products
+condition.column = id
+condition.operator = =
+condition.value = 10
+11. Searching and Indexing
+Linear search
+for each record:
+    compare requested key
+    if match:
+        return record
+Worst-case time complexity: O(n).
+Simple indexed search
+Sorted index
+    ↓
+Binary search
+    ↓
+candidate record location
+    ↓
+record lookup
+Binary search over a sorted index is O(log n) for the search itself, but maintaining the index adds insertion/deletion work.
+A B-Tree/B+Tree is optional and should only be considered after the simpler system is stable.
+12. Memory Management
+Every allocation needs a clear owner.
+Check malloc/calloc/realloc results.
+Free all owned memory.
+On partial failure, clean up prior allocations.
+Avoid double-free and use-after-free.
+Do not lose the only pointer to allocated memory.
+Record lifecycle
+record_create()
+ ↓ malloc Record
+ ↓ malloc name
+ ↓ copy name
+ ↓ use
+ ↓ record_destroy()
+ ↓ free name
+ ↓ free Record
+Table lifecycle
+table_create()
+ ↓ malloc Table
+ ↓ malloc table name
+ ↓ malloc record array
+ ↓ use
+ ↓ table_destroy()
+ ↓ free owned allocations
+When inserted records own dynamically allocated names, table destruction must free those names before freeing the record array.
+13. Complete Development Roadmap
+Phase
+Deliverable
+0 — Project Design
+Problem, story, requirements, scope, architecture, data/storage decisions.
+1 — Repository Setup
+Folders, README, Makefile, LICENSE, .gitignore, Git.
+2 — Basic Build
+main.c, C11 build, make, make clean.
+3 — Record Model
+Record structure, dynamic name, create/destroy.
+4 — Table Model
+Table structure, create/destroy, dynamic array.
+5 — In-Memory CRUD
+Insert, read/select, update, delete.
+6 — Persistence
+Database file, metadata, read/write, restart persistence.
+7 — Tokenizer
+Break input into tokens.
+8 — Parser
+Convert tokens into commands.
+9 — Executor
+Connect commands to database operations.
+10 — WHERE
+Basic equality filtering.
+11 — Search
+Linear search and tests.
+12 — Index
+Sorted index/binary search if feasible.
+13 — CLI
+Interactive shell and command-line database selection.
+14 — Error Handling
+Input/file/memory/data/corruption errors.
+15 — Testing
+Functional, edge, persistence, integration tests.
+16 — Performance
+Linear vs indexed measurements.
+17 — Documentation
+README, proposal, architecture, examples.
+18 — GitHub Submission
+Clean repository and final verification.
+14. Detailed Implementation Order
+A. Foundation
+Verify compiler.
+Create src/include/tests/data.
+Create README, Makefile, LICENSE, .gitignore.
+Initialize Git.
+Create main.c.
+Compile with -Wall -Wextra -Wpedantic -std=c11.
+Verify make/make clean.
+Commit baseline.
+B. Record
+Create record.h.
+Define Record.
+Declare record_create/destroy.
+Create record.c.
+Implement allocation/copy/cleanup.
+Test record lifecycle.
+Compile warning-free.
+C. Table
+Create table.h.
+Define Table.
+Create table.c.
+Implement table_create/destroy.
+Update Makefile.
+Test empty table.
+Implement table_insert.
+Implement capacity growth.
+Test multiple records.
+Implement select/read.
+Implement update.
+Implement delete.
+Audit ownership.
+D. Persistence
+Define database metadata.
+Choose file format.
+Create/open database.
+Write metadata.
+Read metadata.
+Persist records.
+Reload after restart.
+Test persistence.
+E. Query layer
+Define command types.
+Tokenizer.
+Parse CREATE TABLE.
+Parse INSERT.
+Parse SELECT.
+Parse UPDATE.
+Parse DELETE.
+Parse simple WHERE.
+Error reporting.
+Executor.
+Connect executor to storage/table.
+F. Search/index
+Linear search.
+Benchmark it.
+Design simple index.
+Implement maintenance.
+Implement indexed lookup.
+Benchmark it.
+Test index correctness after mutations.
+G. Finalization
+Interactive CLI.
+Error handling.
+Tests.
+Memory/leak checks.
+Performance report.
+README.
+Proposal.
+Repository cleanup.
+Git history review.
+Final submission.
+15. Testing Strategy
+Functional
+Empty database
+Create table
+Single record
+Multiple records
+Insert
+Select
+Update
+Delete
+Search
+Restart persistence
+Duplicate IDs according to chosen rules
+Edge cases
+Empty strings
+Long strings
+Invalid queries
+Missing database
+Missing table
+Invalid IDs
+Invalid values
+Corrupted data
+Large record count
+Allocation failure
+Unexpected input
+Insertion when capacity is full
+Integration
+CLI → parser → executor → storage
+Create → insert → close → reopen → select
+Insert → update → reopen → verify
+Insert → delete → reopen → verify
+Index after insert/update/delete
+16. Error Handling
+Problem
+Handling
+Allocation failure
+Return failure and clean partial allocations.
+Invalid query
+Report error without crashing.
+Unknown table
+Report missing table.
+File failure
+Check return values and report.
+Duplicate ID
+Reject/handle according to documented rules.
+Invalid data
+Validate before writing.
+Corrupted file
+Detect what can be detected and avoid undefined behavior.
+Full array
+Grow before insertion.
+NULL pointer
+Validate where appropriate.
+17. Performance Evaluation
+Suggested datasets:
+100
+1,000
+10,000
+50,000 (if practical)
+Operations:
+existing-key lookup
+missing-key lookup
+Compare:
+linear search
+indexed search
+Method
+Search Complexity
+Trade-off
+Linear search
+O(n) worst case
+Simple; no index maintenance.
+Binary search on sorted index
+O(log n) search
+Requires index maintenance.
+Record environment, dataset size, operation, and measured time. Do not claim optimization without measurements.
+18. Code Quality Rules
+Meaningful names
+Focused functions
+Proper headers
+Avoid unnecessary globals
+Check return values
+Check allocations
+Free memory
+Avoid buffer overflows
+Use explicit buffer sizes
+Explain non-obvious WHY
+Consistent formatting
+Strict warnings
+Test before commit
+gcc -Wall -Wextra -Wpedantic -std=c11
+19. Git and GitHub Workflow
+Recommended .gitignore
+*.o
+*.obj
+vaultdb
+build/
+.vscode/
+.vs/
+.DS_Store
+*.dSYM/
+Build commands
+make
+make clean
+Example meaningful commits
+Initialize project structure
+Add database record model
+Implement table model
+Implement record insertion
+Implement file storage
+Add query tokenizer
+Implement SELECT
+Implement UPDATE
+Implement DELETE
+Add search tests
+Implement indexing
+Fix memory leak in storage layer
+Update documentation
+Do not submit one giant final commit. Keep the history meaningful and avoid binaries, build artifacts, and secrets.
+20. README Requirements
+Title/description
+Problem statement
+Motivation
+Goals
+Functional specifications
+Non-functional specifications
+Architecture
+Module structure
+Data structures
+Storage design
+Query syntax
+Algorithms
+Complexity
+Installation
+Compilation
+Usage
+Testing
+Performance
+Limitations
+Future work
+21. Proposal Structure
+Section
+Required content
+Title
+VaultDB: A Lightweight Embedded Database Engine Built from Scratch in C
+Problem Statement
+Real-world local persistent storage problem.
+Motivation
+Lightweight/offline local storage.
+Goals
+Technical and learning goals.
+Functional Specs
+Exactly what VaultDB supports.
+Non-Functional Specs
+Lightweight, reliable, persistent, modular, maintainable.
+Architecture
+CLI → Parser → Executor → Storage → Disk; index where applicable.
+Data Structures
+Records, tables, metadata, indexes.
+Storage Design
+Database file representation.
+Query Design
+Supported SQL-like subset.
+Algorithms
+Parsing, searching, indexing, sorting where used.
+Complexity
+Big-O analysis.
+Testing
+Functional, edge, persistence, performance.
+Limitations
+Explicit unsupported features.
+Future Improvements
+Transactions, B-Tree/B+Tree, optimizer, concurrency, recovery, joins, more types.
+22. Final Repository Checklist
+☐ Core implementation is C.
+☐ Clean src/include/tests/data structure.
+☐ make builds the project.
+☐ make clean works.
+☐ Warning-clean compilation.
+☐ Persistent database survives restart.
+☐ CRUD works.
+☐ Limited parser works.
+☐ Executor connects parser and storage.
+☐ WHERE works for supported conditions.
+☐ Linear search works.
+☐ Index works if implemented.
+☐ Memory ownership is documented.
+☐ Allocation failures handled.
+☐ File errors handled.
+☐ Corruption behavior documented.
+☐ Tests cover normal/edge cases.
+☐ Performance comparison documented.
+☐ README complete.
+☐ LICENSE present
+☐ .gitignore correct
+☐ No binaries/build artifacts
+☐ No secrets
+☐ Meaningful Git history
+☐ Another person can build the project from README.
+23. Viva / Interview Preparation
+Be able to explain every major component without reading the code.
+What exactly is VaultDB?
+Why is it a database engine rather than a CRUD application?
+Why C?
+What is a record?
+What is a table?
+Why is persistence needed?
+How is a record represented in memory?
+How is a record represented on disk?
+Why is name dynamically allocated?
+What owns allocated memory?
+Why do count and capacity both exist?
+How does dynamic array growth work?
+What happens when malloc fails?
+What is the difference between . and ->?
+What does the parser do?
+What does the executor do?
+Why separate parser and storage?
+How does SELECT work?
+How does WHERE work?
+Why is linear search O(n)?
+How does the index work?
+Why can binary search be O(log n)?
+What is the cost of maintaining an index?
+How does persistence survive restart?
+What happens on corrupted data?
+Why not full SQL?
+Why not B-Tree initially?
+What are the limitations?
+What would you implement next?
+24. Scope Control Rules
+Build the simplest working version first.
+Do not add features merely because they sound impressive.
+Do not implement full SQL.
+Do not jump to B-Tree before the basic engine works.
+Do not optimize before establishing correctness and a baseline.
+Keep parser, executor, and storage responsibilities separate.
+Do not sacrifice the MVP for bonus features.
+Working + understandable + well-tested is more valuable than huge + incomplete.
+25. End-State Summary
+User
+ ↓
+VaultDB CLI
+ ↓
+Tokenizer / Parser
+ ↓
+Structured Command
+ ↓
+Query Executor
+ ↓
+Table / Record Layer
+ ↓
+Search / Index
+ ↓
+Storage Engine
+ ↓
+database.db
+ ↓
+Disk
+Final sequence:
+1. Repository
+2. Build system
+3. Record model
+4. Table model
+5. In-memory CRUD
+6. Persistence
+7. Parser
+8. Executor
+9. WHERE
+10. Linear search
+11. Index
+12. CLI
+13. Error handling
+14. Tests
+15. Performance
+16. Documentation
+17. GitHub submission
+Appendix — Current Project State
+At the time this master guide was prepared, the project had already reached the following state:
+Repository folders created.
+README.md, Makefile, LICENSE, and .gitignore exist.
+Git initialized with multiple commits.
+Strict C11 compilation configured.
+src/main.c exists.
+include/record.h and src/record.c exist.
+Record creation/destruction implemented and tested.
+include/table.h and src/table.c exist.
+Table creation/destruction implemented and tested.
+Makefile builds main.c, record.c, and table.c.
+Build succeeds with no warnings.
+Current test program creates a table and prints its name, record count, and capacity.
+The next logical implementation phase is table insertion, followed by in-memory CRUD, persistent storage, query processing, indexing, CLI, testing, and final submission.

@@ -12,6 +12,7 @@ typedef struct Table {
 Table *table_create(const char* name, int initial_capacity);
 
 void table_destroy(Table *table);
+int table_insert(Table *table, int id, const char *name, int price, int stock);
 
 #endif
 

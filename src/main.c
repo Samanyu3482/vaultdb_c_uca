@@ -1,15 +1,19 @@
 #include <stdio.h>
 #include"record.h"
+#include"table.h"
 
 int main(void) {
     printf("VaultDB starting...\n");
-    Record *record = record_create(1,"item1",10,100);
-    if(record == NULL) {
-        printf("Record not created\n");
+    
+    Table *products = table_create("products", 4);
+    if(products == NULL) {
+        printf("Table not created\n");
         return 1;
     }
-    printf("Record created successfully\n");
-    record_destroy(record);
-    printf("Record destroyed successfully\n");
+    printf("%s\n", products->name);
+    printf("%d\n", products->record_count);
+    printf("%d\n", products->capacity);
+    table_destroy(products);
+    printf("Table destroyed successfully\n");
     return 0;
 }
