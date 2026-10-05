@@ -1,19 +1,22 @@
 #include <stdio.h>
-#include"record.h"
-#include"table.h"
+#include "table.h"
+#include "storage.h"
 
 int main(void) {
-    printf("VaultDB starting...\n");
+    Table *loaded = storage_load_table("data/test.db");
     
-    Table *products = table_create("products", 4);
-    if(products == NULL) {
-        printf("Table not created\n");
+    if (loaded == NULL) {
+        printf("Failed to load table!\n");
         return 1;
     }
-    printf("%s\n", products->name);
-    printf("%d\n", products->record_count);
-    printf("%d\n", products->capacity);
-    table_destroy(products);
-    printf("Table destroyed successfully\n");
+
+    printf("Successfully loaded table '%s' with %d records:\n", loaded->name, loaded->record_count);
+    
+    for (int i = 0; i < loaded->record_count; i++) {
+        Record *r = &loaded->records[i];
+        printf(" - [%d] %s (Price: %d, Stock: %d)\n", r->id, r->name, r->price, r->stock);
+    }
+
+    table_destroy(loaded);
     return 0;
 }
