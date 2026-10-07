@@ -35,6 +35,10 @@ Command parse_command(const char *query) {
         cmd.has_where = 1;
         return cmd;
     }
+    if (sscanf(query, "CREATE TABLE %255[^;];", cmd.table_name) == 1) {
+        cmd.type = CMD_CREATE_TABLE;
+        return cmd;
+    }
 
     return cmd;
 }
